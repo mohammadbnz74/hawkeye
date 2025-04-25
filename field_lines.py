@@ -11,10 +11,13 @@ def select_points(event, x, y, flags, param):
 
 # Load the image
 image = cv2.imread('data/football/field.jpg')
+print(image.shape)
 # image = cv2.resize(image, (600,400))
-x0 = 72
-for i in range(23):
-    cv2.line(image, (x0+i*67,0), (x0+i*67,3000), (0,255,255), 1)
+x0 = 30
+for i in range(22):
+    x = x0+i*39
+    cv2.line(image, (x,0), (x,3000), (0,255,255), 1)
+    print(x)
 cv2.imshow('', image)
 key = cv2.waitKeyEx()
 '''

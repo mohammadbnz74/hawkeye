@@ -3,7 +3,8 @@ import cv2
 
 i = 2
 # Example points: Four points from Image 1 and Image 2
-H = np.load(f'data/homography/homography_matrix.npy')
+H = np.load(f'data/football/homography_matrix.npy')
+H = np.linalg.inv(H)
 image1 = cv2.imread("data/football/field.jpg")
 cap = cv2.VideoCapture(f'data/football/output.mp4')
 ret, frame = cap.read()

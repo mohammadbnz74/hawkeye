@@ -46,10 +46,18 @@ def get_four_points(image_path, window_name):
     cv2.destroyAllWindows()
     return points
 
+
+points_img1 = np.array([
+    [105/2, 0],          # bottom-left corner
+    [88.5, 54.16],        # bottom-right
+    [105/2, 24.85],       # top-right
+    [16.5, 54.16]          # top-left
+], dtype=np.float32)
+
 # Load images
-image1_path = "data/football/field.jpg"
-print("Select four points in the first image...")
-points_img1 = get_four_points(image1_path, "Image 1")
+# image1_path = "data/football/field.jpg"
+# print("Select four points in the first image...")
+# points_img1 = get_four_points(image1_path, "Image 1")
 
 image2_path = "data/football/frame.jpg"
 print("Select four points in the second image...")
@@ -57,4 +65,13 @@ points_img2 = get_four_points(image2_path, "Image 2")
 
 H, status = cv2.findHomography(np.array(points_img1), np.array(points_img2), method=0)
 
-np.save('data/football/homography_matrix.npy', H)
+np.save('./homography_matrix.npy', H)
+
+# Warp the image to a top-down view (size = field in meters * scale)
+scale = 10  # pixels per meter
+output_size = (int(105 * scale), int(68 * scale))  # width, height
+
+image = cv2.imread(image2_path)
+warped = cv2.warpPerspective(image, H, output_size)
+cv2.imshow('', warped)
+cv2.waitKey()
