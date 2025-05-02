@@ -1,38 +1,92 @@
 import numpy as np
 import cv2
+from utils import *
+import os
 
-# Example Homography (replace with yours)
-H = np.load('data/football/homography_matrix.npy')
-# Two lines in the world (both parallel in world, but not collinear)
-A1 = np.array([0, 0, 1])
-A2 = np.array([1000, 0, 1])
-B1 = np.array([0, 10, 1])
-B2 = np.array([1000, 10, 1])
 
-# Project to image
-a1 = H @ A1
-a2 = H @ A2
-a1 /= a1[2]
-a2 /= a2[2]
+def draw_line_to_vp(canvas, line_segment, vp_canvas):
+    if line_segment is None:
+        return
+    p1, p2 = line_segment
+    d1 = np.linalg.norm(np.array(p1) - np.array(vp_canvas))
+    d2 = np.linalg.norm(np.array(p2) - np.array(vp_canvas))
+    
+    # Draw from the farther point toward the vanishing point
+    if d1 > d2:
+        start = p1
+    else:
+        start = p2
 
-b1 = H @ B1
-b2 = H @ B2
-b1 /= b1[2]
-b2 /= b2[2]
+    cv2.line(canvas, start, vp_canvas, (0, 255, 255), 1)
 
-# Get lines from point pairs
-line1 = np.cross(a1, a2)
-line2 = np.cross(b1, b2)
 
-# Vanishing point = intersection of these two image lines
-vp = np.cross(line1, line2)
-vp /= vp[2]
-# Show on a blank image
-img = np.ones((600, 800, 3), dtype=np.uint8) * 255
-vp_pt = (int(vp[0]), int(vp[1]))
-cv2.circle(img, vp_pt, 8, (0, 0, 255), -1)
-cv2.putText(img, "Vanishing Point", (vp_pt[0]+10, vp_pt[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 1)
+field = cv2.imread('data/football/field.jpg')
+h_field, w_field = field.shape[:2]
+x0 = 30
+y1, y2 = 0, h_field - 1
 
-cv2.imshow("Vanishing Point", img)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+matrix_pth = 'data/football/homography_matrix.npy'
+
+H = np.load(matrix_pth)
+H = np.linalg.inv(H)
+
+image_pth = 'data/football/frame.jpg'
+image = cv2.imread(image_pth)
+height, width = image.shape[:2]
+
+lines = []
+
+for x in [0,37,134,347,419,493,704,801,840]:
+    # x = x0 + i * 39
+    original_line = compute_line((x, y1), (x, y2))
+    line = transform_line(H, original_line)
+    lines.append(line)
+# Compute vanishing point from line intersections
+vp = None
+count = 0
+sum_vp = np.zeros(2)
+for i in range(len(lines)):
+    for j in range(i + 1, len(lines)):
+        pt = compute_intersection(lines[i], lines[j])
+        if pt is not None and -5 * width < pt[0] < 6 * width and -5 * height < pt[1] < 6 * height:
+            sum_vp += pt
+            count += 1
+
+if count > 0:
+    vp = sum_vp / count
+    vp_int = vp.astype(int)
+
+    # Calculate required margins
+    left_margin = max(0, -vp_int[0])
+    right_margin = max(0, vp_int[0] - width)
+    top_margin = max(0, -vp_int[1])
+    bottom_margin = max(0, vp_int[1] - height)
+
+    # New canvas size
+    canvas_w = width + left_margin + right_margin
+    canvas_h = height + top_margin + bottom_margin
+
+    # Create new canvas and paste the original image
+    canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
+    canvas[top_margin:top_margin + height, left_margin:left_margin + width] = image
+
+    # Update image and vanishing point position relative to new canvas
+    # image = canvas
+    vp_int_canvas = (vp_int[0] + left_margin, vp_int[1] + top_margin)
+
+    # Draw the vanishing point
+    cv2.circle(canvas, vp_int_canvas, 6, (0, 0, 255), -1)
+
+    for line in lines:
+        segment = line_intersections_with_borders(line, canvas_w, canvas_h)
+        if segment:
+            for seg in segment:
+                cv2.circle(image, seg, 50, (200,100,200), -1)
+        draw_line_to_vp(canvas, segment, vp_int_canvas)
+
+    canvas_display = cv2.resize(canvas, (800,600))
+    cv2.imshow('Vanishing Point (Extended)', canvas_display)
+else:
+    cv2.imshow('Vanishing Point', image)
+
+key = cv2.waitKey()
